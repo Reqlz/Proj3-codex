@@ -1,0 +1,17 @@
+Features:
+Increase the size of the charm rack as a rebirth option
+Change the charm rack hook UI to be a shelving unit with 3 available and 3 locked places (2 rows)
+Add a higher progression ceiling
+Expand out skill trees to make the headstones at the end even stronger, but turning the current headstones into milestones
+Add more uses for stardust late game, right now earning it is important but it's not useful to spend
+Increase mana cost for transmutation, with dust -> elixr being the most expensive and essence -> shards being the cheapest
+5 cont. Maybe allow stardust to convert to mana through some way, with cooldown
+Need more ways to generate shards late game
+Elixr infusion on charms needs to scale more aggressively with level
+Add an optional tutorial at the end of the initial walkthrough to explain some more things and uses for different materials
+Update the "uses" tabs at the top for each material to be a hover tooltip (using the standard circled i for information icon), more concise
+Expensive stardust cost to allow a re-allocation of permanent legacy, alternatively give 1 reset every re-awakening/other re-awakening 
+
+Bug-fixes:
+When interacting with the enchantments skill tree, the original tkinter window top bar starts z-fighting the custom top bar
+The ground doesn't look like grass, for ages I actually thought we were on a giant pillar. Add a subtle grass texture over the ground, leave the other grass/shrubbery like things as is over top of the new grass
