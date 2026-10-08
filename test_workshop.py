@@ -9,13 +9,13 @@ import unittest
 from unittest.mock import Mock, patch
 
 from main import (State, Economy, Crafting, SpellTree, Deliveries, Encounters,
-                  SaveStore, Preferences, MusicPlayer, TREE, RECHARGE_COSTS,
+                  SaveStore, Preferences, MusicPlayer, TREE, RECHARGE_COSTS, INFUSION_COSTS,
                   RESTORATION_COSTS, SPIRIT_PERCENTAGES, can_pay)
 
 
 class WorkshopTests(unittest.TestCase):
     def ready(self):
-        return Economy(State(resources=[1e7]*5,owned=[35,100,15,4,1],research=[2]*5,run_mana=500000))
+        return Economy(State(shelf_level=2,resources=[1e7]*5,owned=[35,100,15,4,1],research=[2]*5,run_mana=500000))
 
     def test_roles_and_atomic_payment_every_variant(self):
         for tier in range(1,5):
@@ -25,7 +25,7 @@ class WorkshopTests(unittest.TestCase):
                     c=Crafting(e)
                     recipe=c.price(target,False,mode,tier,True)
                     self.assertEqual(recipe[4],0)
-                    self.assertEqual(recipe[3],RECHARGE_COSTS[tier-1])
+                    self.assertEqual(recipe[3],INFUSION_COSTS[tier-1])
                     self.assertEqual(recipe,c.price(target,True,mode,tier,True))
                     if target<2 and mode=="online":
                         self.assertEqual(recipe[2],0)
@@ -103,7 +103,7 @@ class WorkshopTests(unittest.TestCase):
         self.assertEqual(c.restoration_price(0),(510,85,0,0,0))
         c.restore(0)
         self.assertAlmostEqual(e.bonus(0),1.20)
-        self.assertAlmostEqual(c.transmutation(2)[0][0],3.5)
+        self.assertAlmostEqual(c.transmutation(2)[0][0],17.5)
 
     def test_restore_transmute_and_reset(self):
         e=self.ready()
@@ -112,9 +112,10 @@ class WorkshopTests(unittest.TestCase):
             self.assertEqual(RESTORATION_COSTS[i][2:],(0,0,0))
             self.assertTrue(c.restore(i))
             self.assertEqual(e.construction_level(i),1)
-        e.state.run_dust=120
+        e.state.resources=[100000,10000,1000,100,200]
+        e.state.rebirth_dust=120
         before=(e.state.run_dust,e.state.run_mana,e.state.lifetime_mana)
-        for i,ratio,fee in ((4,3,50),(3,2,15),(2,2,5)):
+        for i,ratio,fee in ((4,3,500),(3,2,100),(2,2,25)):
             stock=e.state.resources[:]
             self.assertTrue(c.transmute(i,10))
             self.assertEqual(e.state.resources[i],stock[i]-10)

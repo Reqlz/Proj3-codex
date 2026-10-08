@@ -101,7 +101,7 @@ class BranchingTests(unittest.TestCase):
             e.state.spell_advanced["Sanctuary"]=[1,1]
             store.save(e.state)
             self.assertEqual(store.load()[0],e.state)
-            e.state.run_dust=120
+            e.state.rebirth_dust=120
             e.reawaken()
             self.assertTrue(all(not any(r) for r in e.state.spell_advanced.values()))
 
@@ -139,7 +139,7 @@ class BranchingTests(unittest.TestCase):
                 self.assertAlmostEqual(e.construction_bonus(target),.05*(level+1))
             self.assertFalse(c.restore(target))
         self.assertEqual(len(e.state.restorations),5)
-        e.state.run_dust=120
+        e.state.rebirth_dust=120
         self.assertEqual(State.parse(asdict(e.state)),e.state)
         e.reawaken()
         self.assertEqual(e.state.restoration_levels,[0]*5)

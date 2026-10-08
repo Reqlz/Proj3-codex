@@ -10,6 +10,7 @@ import struct
 from unittest.mock import patch
 
 from PIL import Image
+from learning import LESSONS
 from main import AtelierApp, SaveStore, PRESTIGE_TARGET, SlotManager, SCENE_ANCHORS, SCENE_FOOTPRINTS
 
 
@@ -119,6 +120,9 @@ def verify(output=None):
             shot("01-new-sanctuary")
             click_button(app.panel, "Buy 1 · 30.0 Mana")
             assert app.economy.state.owned[0] == 1, errors
+            app.economy.state.tutorial_skipped=True
+            app.economy.state.guide_step=10
+            app.economy.state.lessons_seen=list(LESSONS)
             app.economy.state.run_mana = 500000
             app.economy.state.resources = [1e7, 1e6, 1e5, 1e4, 300]
             app.economy.state.owned = [28, 24, 12, 6, 3]
@@ -235,20 +239,26 @@ def verify_expansion(output=None):
             assert app.economy.state.sanctuary_name=="The Amber Observatory"
             shot("21-guided-first-steps")
             click(app.panel,"Buy 1 · 30.0 Mana")
+            app.finish_lesson()  # Acknowledge stock versus net rate.
             app.economy.advance(20)
             app.draw_ui()
             click(app.panel,"Buy 1 · 60.0 Mana")
             app.select_building(1)
-            assert app.economy.state.tutorial_step==4
+            assert app.economy.state.guide_step==4
+            app.set_tab("Research")
+            app.finish_lesson()
+            app.set_tab("Workshop")
+            app.finish_lesson();app.finish_lesson()
             app.open_tome()
             assert app.economy.state.tutorial_step==5
             shot("22-spell-tome")
-            click(app.tome_canvas,"View all chapters")
+            app.toggle_tome_all()
             app.choose_chapter("astral")
             assert "astral" in app.economy.state.chapters_read
             assert "astral" not in app.economy.state.chapters_unlocked
             shot("23-tome-preview")
             app.close_tome()
+            app.economy.state.lessons_seen=list(LESSONS)
             app.economy.state.run_mana=500000
             app.economy.state.resources=[1e7]*5
             app.economy.state.owned=[20,20,12,10,5]
@@ -284,7 +294,7 @@ def verify_expansion(output=None):
             app.confirm_prestige()
             app.toggle_retain(1)
             app.toggle_retain(4)
-            assert app.retain=={0,2,4}
+            assert app.retain=={4}
             shot("28-talisman-retention")
             app.dismiss()
             assert len(app.economy.state.talismans)==5
@@ -325,12 +335,12 @@ def verify_expansion(output=None):
             app.confirm_prestige()
             app.toggle_retain(1)
             app.toggle_retain(4)
-            click(app.modal_canvas,"Reawaken · keep 3/3 talismans")
+            click(app.modal_canvas,"Reawaken · keep 1/1 talisman")
             app.select_legacy(0)
             click(app.modal_canvas,"Reawaken with this memory")
-            assert app.economy.state.talismans==[0,2,4],(app.economy.state.talismans,app.retain,app.economy.reward(),app.modal)
+            assert app.economy.state.talismans==[4],(app.economy.state.talismans,app.retain,app.economy.reward(),app.modal)
             assert app.economy.state.charms==[]
-            assert app.store.load()[0].talismans==[0,2,4]
+            assert app.store.load()[0].talismans==[4]
             app.return_to_slots()
             shot("34-minimum-slots")
             app.name_slot(2,False)
@@ -372,6 +382,9 @@ def verify_workshop(output=None):
         errors=[]
         root.report_callback_exception=lambda kind,value,trace:errors.append(value)
         app=AtelierApp(root,SaveStore(Path(temp)/"save.json"),start_loop=False,show_welcome=False)
+        app.economy.state.tutorial_skipped=True
+        app.economy.state.guide_step=10
+        app.economy.state.lessons_seen=list(LESSONS)
         def shot(name):
             root.update()
             app.layout()
@@ -513,6 +526,9 @@ def verify_branching(output=None):
         errors=[]
         root.report_callback_exception=lambda kind,value,trace:errors.append((value,trace))
         app=AtelierApp(root,SaveStore(Path(temp)/"branch.json"),start_loop=False,show_welcome=False,apply_preferences=False)
+        app.economy.state.tutorial_skipped=True
+        app.economy.state.guide_step=10
+        app.economy.state.lessons_seen=list(LESSONS)
         def flush():
             root.update()
             app.layout()
@@ -537,7 +553,7 @@ def verify_branching(output=None):
             shot("60-parchment-main-window",root)
             app.open_tree()
             shot("61-tree-overview")
-            assert len(app.tree_boxes)==18
+            assert len(app.tree_boxes)==27
             before=s.resources[:]
             box=app.tree_boxes[("Sanctuary",0)]
             x,y=(box[0]+box[2])/2,(box[1]+box[3])/2
@@ -558,10 +574,14 @@ def verify_branching(output=None):
             app.centre_tree()
             shot("62-tree-zoomed-detail")
             price=SpellTree(app.economy).price("Sanctuary",0)
+            app.sync_time()
+            before=s.resources[:]
+            played=s.played
+            net=app.economy.flows()[1]
             button=next(e for e in app.tree_detail.controls.entries if e["label"]=="Purchase inscription")
             click(app.tree_detail,button)
             assert s.spell_ranks["Sanctuary"][0]==1,errors
-            assert before[1]-price[1]<=s.resources[1]<before[1],(s.resources,before,price)
+            assert abs(s.resources[1]-(before[1]+net[1]*(s.played-played)-price[1]))<.01,(s.resources,before,price)
             saved_view=app.tree_view[:]
             app.close_tree();app.open_tree()
             assert saved_view==app.tree_view
@@ -614,7 +634,7 @@ def verify_branching(output=None):
             assert app.scene.cget("cursor")=="arrow"
             app.preferences.values["celestial_cursor"]=True
             frame=app.frames[root]
-            frame.maximise();root.update();assert root.state()=="zoomed"
+            frame.maximise();root.update();assert root.state()=="normal"
             frame.maximise();root.update();assert root.state()=="normal"
             root.iconify();root.update();assert root.state()=="iconic"
             root.deiconify();root.update()
@@ -641,9 +661,98 @@ def verify_branching(output=None):
             app.select_legacy(0)
             shot("70-legacy-bonus-choice",app.modal)
             app.dismiss(force=True)
-            assert s.legacies==[0]*6
+            assert s.legacies==[0]*7
             assert not errors,errors
-            print("Branching UI passed: graph pan/zoom/selection, purchase, state retention, window switching, safe outside dismissal, press/release/cancel, keyboard activation, six cursors, maximise and minimise.")
+            print("Branching UI passed: graph pan/zoom/selection, purchase, state retention, window switching, safe outside dismissal, press/release/cancel, keyboard activation, six cursors, fixed windows and minimise.")
+        finally:app.destroy()
+
+
+def verify_future(output=None):
+    from main import Crafting,CelestialWorkbench,LEGACIES
+    with tempfile.TemporaryDirectory() as temp:
+        root=tk.Tk()
+        errors=[]
+        root.report_callback_exception=lambda kind,value,trace:errors.append(value)
+        app=AtelierApp(root,SaveStore(Path(temp)/"future.json"),start_loop=False,show_welcome=False,apply_preferences=False)
+        app.economy.state.tutorial_skipped=True
+        app.economy.state.guide_step=10
+        app.economy.state.lessons_seen=list(LESSONS)
+        def refresh():
+            root.update();app.layout();root.update()
+            assert not errors,errors
+        def shot(name,surface=None):
+            refresh()
+            if output:capture(surface or root,Path(output)/f"{name}.png")
+        try:
+            s=app.economy.state
+            s.resources=[1e8]*5;s.owned=[35,100,15,4,1];s.research=[3]*5
+            s.run_mana=1e6;s.awakenings=3;s.legacies[6]=3;s.materials_tutorial=6
+            for i in range(5):
+                assert app.crafting.craft(i)
+                assert app.crafting.equip(i)
+            assert app.crafting.light_lantern()
+            for size in ("1440x900","1100x720"):
+                root.geometry(size);app.set_tab("Workshop");app.set_crafting_section("Charms")
+                shot("80-cabinet-"+size)
+                app.set_crafting_section("Workbench")
+                shot("81-workbench-"+size)
+                app.open_tree();app.fit_tree()
+                assert app.frames[app.tree_window].native or app.tree_window.overrideredirect()
+                assert not any(app.tree_window.resizable())
+                before=(app.tree_window.winfo_x(),app.tree_window.winfo_y())
+                frame=app.frames[app.tree_window]
+                for _ in range(5):
+                    app.tree_canvas.focus_set();root.update()
+                    frame.bar.focus_set();root.update()
+                    app.tree_zoom(1.15);app.fit_tree()
+                assert app.frames[app.tree_window].native or app.tree_window.overrideredirect()
+                assert before==(app.tree_window.winfo_x(),app.tree_window.winfo_y())
+                assert all(-2<=r[0] and -2<=r[1] and r[2]<=app.tree_canvas.winfo_width()+2 and r[3]<=app.tree_canvas.winfo_height()+2 for r in app.tree_boxes.values())
+                shot("82-extended-tree-"+size,app.tree_window)
+                app.tree_selected=("Sanctuary",8);app.draw_tree_detail()
+                shot("83-final-capstone-"+size,app.tree_window)
+                app.close_tree();app.set_tab("Reawakening")
+                app.show_legacy_reallocation()
+                app.edit_legacy_allocation(6,-1)
+                app.edit_legacy_allocation(0,1)
+                # Lit lantern prevents shrinking its cabinet: no payment.
+                before=s.resources[:]
+                assert not app.economy.reallocate_legacies(app.legacy_draft)
+                assert before==s.resources
+                shot("84-legacy-reallocation-"+size,app.modal)
+                app.escape();assert s.legacies[6]==3
+                app.start_materials_tutorial()
+                assert s.guide_step==7 and app.guide_active
+                assert not any(app.background.itemcget(item,"text")=="FIELD NOTES" for item in app.background.find_all() if app.background.type(item)=="text")
+                shot("85-materials-tour-"+size)
+                app.skip_learning()
+                assert s.materials_tutorial==6
+            root.attributes("-fullscreen",True);app.frames[root].update_visibility()
+            app.set_tab("Workshop");app.set_crafting_section("Charms")
+            shot("86-fullscreen-cabinet")
+            app.open_tree();shot("87-fullscreen-extended-tree",app.tree_window)
+            app.close_tree()
+            app.draw_ui();assert not any(e["label"]=="Uses" for e in app.background.controls.entries)
+            rect,role=app.background.info_regions[4]
+            app.background.event_generate("<Motion>",x=int((rect[0]+rect[2])/2),y=int((rect[1]+rect[3])/2))
+            app.draw_ui()
+            until=time.monotonic()+.7
+            while time.monotonic()<until:root.update();time.sleep(.01)
+            assert app.tooltip.window and app.tooltip.current_text==role
+            app.tooltip.hide()
+            s.lantern_remaining=0
+            for i in (3,4):app.crafting.dismantle(i)
+            app.set_tab("Reawakening");app.show_legacy_reallocation()
+            for _ in range(3):app.edit_legacy_allocation(6,-1);app.edit_legacy_allocation(0,1)
+            before=s.resources[4]
+            entry=next(e for e in app.modal_canvas.controls.entries if e["label"]=="Pay and apply this allocation")
+            assert entry["enabled"]
+            entry["callback"]()
+            assert not app.modal and s.legacies==[3,0,0,0,0,0,0]
+            assert s.resources[4]<before
+            assert app.store.load()[0].legacies==s.legacies
+            assert not errors,errors
+            print("Future UI passed: fixed frameless tree, focus/zoom stability, 27 visible nodes, cabinet, lantern, workbench, safe reallocation, materials tour, fullscreen and both window sizes.")
         finally:app.destroy()
 
 
@@ -652,9 +761,11 @@ if __name__ == "__main__":
     parser.add_argument("--capture")
     parser.add_argument("--workshop-only",action="store_true")
     parser.add_argument("--branching-only",action="store_true")
+    parser.add_argument("--future-only",action="store_true")
     args=parser.parse_args()
-    if not args.workshop_only and not args.branching_only:
+    if not args.workshop_only and not args.branching_only and not args.future_only:
         verify(args.capture)
         verify_expansion(args.capture)
-    if not args.branching_only:verify_workshop(args.capture)
-    verify_branching(args.capture)
+    if not args.branching_only and not args.future_only:verify_workshop(args.capture)
+    if not args.future_only:verify_branching(args.capture)
+    verify_future(args.capture)

@@ -55,8 +55,20 @@ class WindowFrame:
         previous=get(hwnd,-4)
         put(hwnd,-16,get(hwnd,-16) & ~0x00C50000)
         proc_type=ct.WINFUNCTYPE(ct.c_ssize_t,wt.HWND,wt.UINT,wt.WPARAM,wt.LPARAM)
+        class StyleStruct(ct.Structure):
+            _fields_=[("old",wt.DWORD),("new",wt.DWORD)]
         @proc_type
         def procedure(handle,message,wparam,lparam):
+            if message==0x7c and (wparam & 0xffffffff)==0xfffffff0 and lparam:
+                # Tk reapplies window styles on activation and geometry changes.
+                # Keep its managed ownership, but never restore native chrome.
+                style=ct.cast(lparam,ct.POINTER(StyleStruct)).contents
+                style.new &= ~0x00C50000
+                return 0
+            if message==0x85:  # WM_NCPAINT: parchment owns all frame painting.
+                return 0
+            if message==0x86:  # WM_NCACTIVATE: update activation without painting.
+                return call(previous,handle,message,wparam,-1)
             if message==0x83 and wparam:  # WM_NCCALCSIZE: the client draws the frame.
                 return 0
             if message==0x84:  # Client only: no native resizing or dragging.
@@ -236,7 +248,7 @@ class CanvasButtons:
     def press(self,event):
         self.canvas.focus_set()
         entry=self.hit(event)
-        if entry and entry["enabled"]:
+        if entry and entry["enabled"] and getattr(self.app,"guide_control_allowed",lambda c,r:True)(self.canvas,entry["rect"]):
             self.pressed=self.focus=entry["key"]
             self.paint()
         return "break"
@@ -245,9 +257,9 @@ class CanvasButtons:
         key=self.pressed;self.pressed=None
         entry=self.hit(event)
         self.paint()
-        if entry and entry["enabled"] and entry["key"]==key:
+        if entry and entry["enabled"] and entry["key"]==key and getattr(self.app,"guide_control_allowed",lambda c,r:True)(self.canvas,entry["rect"]):
             before=self.app.feedback_until
-            entry["callback"]()
+            self.app.activate_learning_control(self.canvas,entry["rect"],entry["callback"])
             if self.app.feedback_until!=before and not self.app.reduced_motion and self.canvas.winfo_exists():
                 self.flash_rect=entry["rect"]
                 if self.flash_timer:self.canvas.after_cancel(self.flash_timer)
@@ -271,21 +283,34 @@ class CanvasButtons:
         if key!=self.hovered:
             self.hovered=key;self.paint()
         self.app.cursor_on(self.canvas)
-        if entry and entry["tip"]:self.app.tooltip.show(entry["tip"],event)
+        x,y=self.canvas.canvasx(event.x),self.canvas.canvasy(event.y)
+        info=next((tip for (x1,y1,x2,y2),tip in getattr(self.canvas,"info_regions",[]) if x1<=x<=x2 and y1<=y<=y2),None)
+        if info:self.app.tooltip.show(info,event)
+        elif entry and entry["tip"]:self.app.tooltip.show(entry["tip"],event)
         else:self.app.tooltip.hide()
 
     def leave(self,event):
         self.hovered=None;self.paint();self.app.tooltip.hide()
 
     def tab(self,event,direction=1):
-        keys=[e["key"] for e in self.entries if e["enabled"]]
+        keys=[e["key"] for e in self.entries if e["enabled"] and getattr(self.app,"guide_control_allowed",lambda c,r:True)(self.canvas,e["rect"])]
         if not keys:return
         index=keys.index(self.focus) if self.focus in keys else (-1 if direction==1 else 0)
-        self.focus=keys[(index+direction)%len(keys)]
+        next_index=index+direction
+        if index>=0 and (next_index<0 or next_index>=len(keys)):
+            target=self.canvas.tk_focusNext() if direction==1 else self.canvas.tk_focusPrev()
+            if target and target!=self.canvas:
+                target.focus_set();return "break"
+        self.focus=keys[next_index%len(keys)]
+        entry=next(e for e in self.entries if e["key"]==self.focus)
+        region=self.canvas.cget("scrollregion").split()
+        if len(region)==4:
+            y=entry["rect"][1];bottom=entry["rect"][3];top=self.canvas.canvasy(0)
+            if y<top or bottom>top+self.canvas.winfo_height():self.canvas.yview_moveto(max(0,y-15)/max(1,float(region[3])))
         self.paint()
         return "break"
 
     def activate(self,event):
-        entry=next((e for e in self.entries if e["key"]==self.focus and e["enabled"]),None)
-        if entry:entry["callback"]()
+        entry=next((e for e in self.entries if e["key"]==self.focus and e["enabled"] and getattr(self.app,"guide_control_allowed",lambda c,r:True)(self.canvas,e["rect"])),None)
+        if entry:self.app.activate_learning_control(self.canvas,entry["rect"],entry["callback"])
         return "break"

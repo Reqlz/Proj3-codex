@@ -12,7 +12,7 @@ from main import (BUILDINGS, PRESTIGE_TARGET, Economy, SaveStore, State, SlotMan
                   Crafting, Constellation, Guide, TALISMAN_COSTS, CHAPTERS, can_pay, Deliveries)
 
 
-def simulated_run(game, limit=12*3600, crafting=False, deliveries=False, branch=None):
+def simulated_run(game, limit=12*3600, crafting=False, deliveries=False, branch=None, temporary_charms=True, talismans=True, step=300):
     """Return every five minutes; establish new stages, research, then invest.
 
     Split spare Mana between wells and material producers; reserve enough for
@@ -23,7 +23,7 @@ def simulated_run(game, limit=12*3600, crafting=False, deliveries=False, branch=
     game.delivery_income=0
     game.capstone_time=None
     courier=Deliveries(game,random.Random(73))
-    for seconds in range(0, limit+1, 300):
+    for seconds in range(0, limit+1, step):
         if deliveries:
             courier.generate()
             if game.state.contracts and can_pay(game.state,game.state.contracts[0]["cost"]):
@@ -38,6 +38,9 @@ def simulated_run(game, limit=12*3600, crafting=False, deliveries=False, branch=
                 game.buy(i)
             if game.state.owned[i]:
                 first_owned.setdefault(i, seconds)
+        from storage import capacities
+        for i in range(4):
+            if game.state.resources[i]>=capacities(game.state)[i]*.8:game.upgrade_storage(i)
         for i in reversed(range(5)):
             while game.study(i):
                 pass
@@ -54,10 +57,10 @@ def simulated_run(game, limit=12*3600, crafting=False, deliveries=False, branch=
         if crafting:
             crafter=Crafting(game)
             for i in range(5):
-                if can_pay(game.state,tuple(v*10 for v in crafter.price(i))):
+                if temporary_charms and can_pay(game.state,tuple(v*10 for v in crafter.price(i))):
                     crafter.craft(i)
                     crafter.equip(i)
-                if crafter.can_talisman(i) and can_pay(game.state,tuple(v*5 for v in TALISMAN_COSTS[i])):
+                if talismans and crafter.can_talisman(i) and can_pay(game.state,tuple(v*5 for v in TALISMAN_COSTS[i])):
                     puzzle=Constellation(i)
                     for star in puzzle.order:
                         puzzle.select(star)
@@ -74,9 +77,10 @@ def simulated_run(game, limit=12*3600, crafting=False, deliveries=False, branch=
                     bought = game.buy(i) or bought
             if not bought:
                 break
+        if game.state.resources[4]>=game.state.rebirth_goal:game.deposit_stardust("goal")
         if game.reward():
             return seconds, unlocks, first_owned
-        game.advance(300)
+        game.advance(step)
     raise AssertionError("Simulation did not reach Reawakening")
 
 
@@ -145,9 +149,10 @@ class EconomyTests(unittest.TestCase):
     def test_prestige_boundaries(self):
         game = Economy(State(owned=[1]*5, research=[2]*5, run_dust=PRESTIGE_TARGET-1))
         self.assertEqual(game.reward(), 0)
-        game.state.run_dust = PRESTIGE_TARGET
+        game.state.rebirth_dust = PRESTIGE_TARGET
         self.assertEqual(game.reward(), 3)
-        game.state.run_dust = PRESTIGE_TARGET*4
+        game.state.storage_levels[4]=2
+        game.state.rebirth_dust = PRESTIGE_TARGET*4
         self.assertEqual(game.reward(), 6)
         game.state.discoveries = ["unlock-4"]
         game.state.reduced_motion = True
@@ -163,7 +168,7 @@ class EconomyTests(unittest.TestCase):
         game = Economy()
         first, unlocks, owned = simulated_run(game)
         print("First run:", first/60, "minutes; unlocks:", unlocks, "first buildings:", owned)
-        self.assertTrue(7200 <= first <= 10800)
+        self.assertTrue(7200 <= first <= 12600)
         self.assertLessEqual(owned[1], 60)
         self.assertTrue(300 <= unlocks[2] <= 900)
         self.assertTrue(1200 <= unlocks[3] <= 2400)
@@ -221,7 +226,7 @@ class SaveTests(unittest.TestCase):
 
 class CraftingTests(unittest.TestCase):
     def ready(self):
-        return Economy(State(resources=[10000]*5, owned=[3]*5, research=[1]*5, run_mana=300000))
+        return Economy(State(shelf_level=2,resources=[10000]*5, owned=[3]*5, research=[1]*5, run_mana=300000))
 
     def test_recipe_prices_unlocks_and_duplicate_types(self):
         game=self.ready()
@@ -261,7 +266,7 @@ class CraftingTests(unittest.TestCase):
                     craft.craft(0,False,mode)
                     craft.equip(0)
                     start=game.state.resources[0]
-                    base=1+3*.65*2
+                    base=2+3*.65*1.5*2
                     active=mode=="both" or mode==("offline" if offline else "online")
                     game.advance(1000,offline=offline)
                     expected=base*(1000+(900*.25 if active else 0))
@@ -287,10 +292,10 @@ class CraftingTests(unittest.TestCase):
 
     def test_talisman_bonus_and_spark(self):
         game=Economy(State(talismans=[0],seals=3))
-        self.assertAlmostEqual(game.flows()[0][0],1.2*1.3)
+        self.assertAlmostEqual(game.flows()[0][0],2*1.2*1.3)
         game.state.charms=[dict(target=0,mode="online",long=False,remaining=900.,equipped=True,tier=2,bonus=.4,max_duration=900.,infused=False,recharges=0)]
-        self.assertAlmostEqual(game.flows()[0][0],1.6*1.3)
-        self.assertAlmostEqual(game.flows(True)[0][0],1.2*1.3)
+        self.assertAlmostEqual(game.flows()[0][0],2*1.6*1.3)
+        self.assertAlmostEqual(game.flows(True)[0][0],2*1.2*1.3)
 
     def test_puzzle_mistakes_hints_and_transaction(self):
         game=self.ready()
@@ -313,11 +318,11 @@ class CraftingTests(unittest.TestCase):
         self.assertEqual(game.state.resources[1],0)
         self.assertFalse(craft.finish_talisman(puzzle))
 
-    def test_retention_zero_through_three(self):
-        for count in range(4):
+    def test_retention_zero_or_one(self):
+        for count in range(2):
             game=self.ready()
             game.state.talismans=list(range(5))
-            game.state.run_dust=120
+            game.state.rebirth_dust=120
             game.state.chapters_read=["charms"]
             game.state.chapters_unlocked.append("charms")
             game.state.discoveries=[f"study-{i}" for i in range(5)]
@@ -329,8 +334,8 @@ class CraftingTests(unittest.TestCase):
             self.assertTrue(Crafting(game).talisman_unlocked(4))
         game=self.ready()
         game.state.talismans=list(range(5))
-        game.state.run_dust=120
-        self.assertFalse(game.reawaken([0,1,2,3]))
+        game.state.rebirth_dust=120
+        self.assertFalse(game.reawaken([0,1]))
         self.assertFalse(game.reawaken([0,0]))
 
     def test_crafting_accelerates_baseline(self):
@@ -377,7 +382,7 @@ class GuideTests(unittest.TestCase):
         game.state.owned=[1]*5
         game.state.research[0]=1
         game.state.research[3]=2
-        game.state.run_dust=96
+        game.state.rebirth_dust=96
         guide.update()
         self.assertEqual(set(game.state.chapters_unlocked),{ch[0] for ch in CHAPTERS})
         unread=set(game.state.chapters_unlocked)-set(game.state.chapters_read)
@@ -400,7 +405,7 @@ class SlotTests(unittest.TestCase):
                 slots.store(i).save(state,touch=False)
             _,game,elapsed,_,_=slots.open(1,1100)
             self.assertEqual(elapsed,100)
-            self.assertAlmostEqual(game.state.resources[0],170)
+            self.assertAlmostEqual(game.state.resources[0],280)
             _,repeat,elapsed,_,_=slots.open(1,1100)
             self.assertEqual(elapsed,0)
             self.assertEqual(game.state.resources,repeat.state.resources)

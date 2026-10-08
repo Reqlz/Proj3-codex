@@ -7,6 +7,7 @@ from presentation import PAPER, LIGHT, INK, GOLD, BURGUNDY
 TEAL,MUTED="#246b66","#79654d"
 BRANCHES=("Charmcraft","Deliveries","Sanctuary")
 ICONS={"Charmcraft":("◇","⌛","✦","☾","⚗","◆"),"Deliveries":("✉","▣","◷","✧","✚","▤"),"Sanctuary":("⚒","☼","⇄","☀","✥","⟳")}
+ICONS={branch:icons+("✺","✶","❖") for branch,icons in ICONS.items()}
 
 
 class SpellGraph:
@@ -25,7 +26,7 @@ class SpellGraph:
         if self.tree_window:
             self.tree_window.lift()
             return
-        win=tk.Toplevel(self.root)
+        win=self.new_window()
         self.tree_window=win
         win.title("The branching spell tree")
         win.transient(self.root)
@@ -56,7 +57,7 @@ class SpellGraph:
         win.protocol("WM_DELETE_WINDOW",self.close_tree)
         self.tree_gesture=None
         self.frame_window(win,"The branching spell tree",self.close_tree)
-        win.update()
+        win.update_idletasks()
         if not getattr(self,"tree_seen",False):
             self.fit_tree()
             self.tree_seen=True
@@ -65,15 +66,15 @@ class SpellGraph:
 
     @staticmethod
     def tree_position(branch,node):
-        radius={0:185,1:365,2:365,4:540,5:540,3:710}[node]
-        offset=-23 if node in (1,4) else 23 if node in (2,5) else 0
+        radius={0:185,1:365,2:365,4:540,5:540,3:710,6:920,7:920,8:1120}[node]
+        offset=-23 if node in (1,4) else 23 if node in (2,5) else -13 if node==6 else 13 if node==7 else 0
         angle=math.radians((-90,30,150)[BRANCHES.index(branch)]+offset)
         return 800+radius*math.cos(angle),800+radius*math.sin(angle)
 
     def fit_tree(self):
         if not self.tree_window:return
         w,h=self.tree_canvas.winfo_width(),self.tree_canvas.winfo_height()
-        scale=max(.25,min(1.6,(w-50)/1540,(h-50)/1540))
+        scale=max(.16,min(1.6,(w-50)/2320,(h-50)/2320))
         self.tree_view=[scale,w/2-800*scale,h/2-800*scale]
         self.draw_tree()
 
@@ -89,7 +90,7 @@ class SpellGraph:
         x=c.winfo_width()/2 if x is None else x
         y=c.winfo_height()/2 if y is None else y
         scale,ox,oy=self.tree_view
-        new=max(.25,min(1.6,scale*factor))
+        new=max(.16,min(1.6,scale*factor))
         self.tree_view=[new,x-(x-ox)*new/scale,y-(y-oy)*new/scale]
         self.draw_tree()
 
@@ -137,10 +138,11 @@ class SpellGraph:
         tree=self.spell_tree()
         self.tree_boxes={}
         hubx,huby=800*scale+ox,800*scale+oy
-        c.create_oval(hubx-30,huby-30,hubx+30,huby+30,fill="#27304b",outline="#b9a4db",width=2)
-        c.create_text(hubx,huby,text="✧",fill="#f6de9e",font=("Segoe UI Symbol",32))
+        hub_radius=max(14,30*scale)
+        c.create_oval(hubx-hub_radius,huby-hub_radius,hubx+hub_radius,huby+hub_radius,fill="#27304b",outline="#b9a4db",width=2)
+        c.create_text(hubx,huby,text="✧",fill="#f6de9e",font=("Segoe UI Symbol",max(18,int(32*scale))))
         for branch in BRANCHES:
-            for node in range(6):
+            for node in range(9):
                 x,y=self.tree_position(branch,node)
                 sources=[(self.tree_position(branch,parent),tree.rank(branch,parent)>=required) for parent,required in tree.prerequisites(node)]
                 if node==0:sources=[((800,800),True)]
@@ -150,10 +152,10 @@ class SpellGraph:
                         xx=(px+(x-px)*fraction)*scale+ox
                         yy=(py+(y-py)*fraction)*scale+oy
                         c.create_oval(xx-2,yy-2,xx+2,yy+2,fill="#b0b5d3" if complete else "#64708d",outline="")
-            for node in range(6):
+            for node in range(9):
                 x,y=self.tree_position(branch,node)
                 cx,cy=x*scale+ox,y*scale+oy
-                radius=max(23,39*scale)
+                radius=max(17,39*scale)
                 box=(cx-radius,cy-radius,cx+radius,cy+radius)
                 self.tree_boxes[(branch,node)]=box
                 rank=tree.rank(branch,node)
@@ -166,7 +168,7 @@ class SpellGraph:
                     c.create_oval(cx-radius-5,cy-radius-5,cx+radius+5,cy+radius+5,fill="#263c4b" if affordable else "#353349",outline="#eee0b8" if selected else "#424e69",width=2 if selected else 1)
                 c.create_oval(*box,fill="#403c56" if full else "#1d293d",outline=colour,width=2)
                 multi=tree.maximum(node)>1
-                c.create_text(cx,cy-(6 if multi else 0),text=ICONS[branch][node],fill=colour,font=("Segoe UI Symbol",max(17,int(25*scale))))
+                c.create_text(cx,cy-(6 if multi else 0),text=ICONS[branch][node],fill=colour,font=("Segoe UI Symbol",max(13,int(25*scale))))
                 if multi:c.create_text(cx,cy+radius*.52,text=f"{rank}/{tree.maximum(node)}",fill="#e5e0d8",font=("Segoe UI",9))
                 if not available and not rank:
                     c.create_text(cx+radius*.75,cy-radius*.75,text="×",fill="#9a9eb5",font=("Segoe UI",10))

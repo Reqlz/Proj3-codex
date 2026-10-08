@@ -15,3 +15,103 @@ Expensive stardust cost to allow a re-allocation of permanent legacy, alternativ
 Bug-fixes:
 When interacting with the enchantments skill tree, the original tkinter window top bar starts z-fighting the custom top bar
 The ground doesn't look like grass, for ages I actually thought we were on a giant pillar. Add a subtle grass texture over the ground, leave the other grass/shrubbery like things as is over top of the new grass
+
+Additionally:
+Remember to always put relevant changes and feature ideas infront of me for me to make decisions on
+
+Implemented decisions (6 October 2026):
+- Kept line 20 as the decision rule; feature choices were presented before implementation.
+- Cabinet legacy: fourth/fifth charm places, then a sixth-place Astral Lantern. No duplicate target charms.
+- Lantern: 10 Stardust, +10% all production, 20 minutes online/offline, no banked charges.
+- Paid legacy reallocation only: 25% of current goal, minimum 100 Stardust.
+- Three tree extensions per branch; original capstones become milestones; final capstones require three Reawakenings.
+- Stardust-to-Mana exchange and Shard quarry commissions, each with a saved 20-minute cooldown.
+- Balance simulation tuned exchange payout to 30 minutes of Mana and quarry cost to two minutes of Mana + 2 Elixirs.
+- Higher reverse-transmutation Mana fees: 500 / 100 / 25; separate infusion costs: 15 / 60 / 240 / 960 Elixirs.
+- Optional materials walkthrough, circled information tooltips, native auxiliary-caption flicker fix and meadow grass texture.
+- Existing saves, old crafted charm stats, spell milestones and contract snapshots are preserved.
+
+
+Next update:
+Astral Cabinet and Charm Storage
+Make the Astral Cabinet a physical object within the sanctuary, with equipped charms visibly occupying its slots.
+Initially provide one usable charm slot.
+Allow additional slots to be unlocked through upgrades to the charm shelf in the Construction menu.
+Preserve the existing Reawakening legacy upgrades that unlock the fourth and fifth charm slots, followed by the Astral Lantern in the sixth.
+Ensure existing saves and previously unlocked charm slots remain compatible.
+
+Reawakening and Permanent Progression
+Make each Reawakening permanently embed a new stone into the existing central pedestal beneath the floating crystal.
+The pedestal should initially have empty sockets, which gradually fill with stones as the player Reawakens.
+Keep the implementation visually simple, without introducing additional engraving, gemstone customisation or complex decorative systems.
+Allow the pedestal to accommodate continued Reawakenings, with the exact visual arrangement left open to implementation.
+Increase the number of permanent legacy points awarded per Reawakening. Consider starting above one point and increasing the reward at later Reawakening milestones.
+Balance the additional legacy points against existing permanent upgrades and progression.
+Consider subtle permanent environmental changes as Reawakening milestones are reached, particularly small constellations becoming visible in the background.
+
+Online Features and Infrastructure
+Begin preparing the game for future online functionality.
+Use reqlabs.co.uk as the target domain, with an appropriate subdomain if necessary.
+The domain is hosted on a VPS with full administrative access. Additional services, Docker containers, databases and other infrastructure can be installed as required.
+Plan the online architecture collaboratively before implementation, including which online features would meaningfully benefit the game.
+Preserve offline functionality and existing local saves.
+
+Sanctuary Interactivity
+Explore ways to make clicking on the sanctuary's station sprites meaningful beyond opening their production information pages.
+Brainstorm optional interactions, events or other gameplay mechanics that encourage players to engage with the physical sanctuary.
+Avoid introducing repetitive clicking requirements that undermine the idle gameplay.
+Material Information and Tutorials
+Remove Stock, Gross Output and Net Inventory from the individual material information windows.
+Replace these statistics with concise explanations of each material's purpose, how it is produced and what it is used for.
+Include small diagrams or illustrations where they would make explanations easier to understand.
+Expand the use of diagrams throughout information windows, particularly for mechanics involving production chains, conversions, charms and other interconnected systems.
+Preserve access to detailed production statistics elsewhere if useful for players managing their economy.
+
+Transmutation
+Significantly increase the available reverse-transmutation batch sizes.
+Treat transmutation primarily as a mid-to-late-game mechanic rather than something designed around early-game resource quantities.
+Keep existing conversion ratios and costs unless further balancing indicates changes are necessary.
+
+Sanctuary Visual Improvements
+Add more environmental detail and background visuals to make the sanctuary feel less empty.
+Explore subtle visual effects linked to permanent progression, construction upgrades and major milestones.
+Consider small constellations appearing in the sky as certain Reawakening or progression milestones are reached.
+Keep visual additions consistent with the existing art style and avoid excessive clutter or distracting effects.
+
+Celestial Visitor Redesign
+Redesign the celestial visitor to be smaller, softer and less visually intrusive.
+Improve its arrival so it enters the sanctuary naturally rather than abruptly appearing.
+Give the visitor a slightly larger clickable hitbox than its visible sprite to make interaction easier.
+Display a small, unobtrusive notification when a celestial visitor arrives.
+Preserve its existing gameplay functionality and optional nature.
+
+Talisman Challenge
+Update visual clarity, change around the minigame if required, ensure a perfect solution is possible
+Make the UI nicer, and feel more satisfying
+Utilise effects such as making it light up, and maybe a short completion visual where the icons fade away and we see just the constellation that was traced, it flares brightly for a moment, then the window closes
+
+
+Implemented next-update decisions (8 October 2026):
+- Each run starts with one charm place plus permanent cabinet places. Two Construction shelves add one place each and reset at Reawakening.
+- Shelf prices: 600 Mana + 120 Shards, then 2,400 Mana + 600 Shards; existing construction discounts apply.
+- Version 10 preserves older saves' current shelf capacity until their next reset and grants missing historical legacy points once.
+- Six first-ring pedestal sockets. Legacy rewards: 1, 1, 2, 2, 3, 3; three thereafter. Later stones continue around the base with compact ring counts.
+- Optional station discoveries: one at a time, 4–7 visible minutes apart, 60 seconds to claim, 20 seconds of saved gross-output value. No prestige-counter rewards or repeat-click farming.
+- Physical cabinet with visible equipped charms; subtle scenery and background constellations at Reawakenings 2, 4 and 6.
+- Illustrated material-purpose windows; detailed production statistics remain in the Production journal and resource strip.
+- Reverse-transmutation batches: 1, 100, 1,000, 10,000 and MAX. Ratios and prices unchanged.
+- Smaller visitor with a natural fading entry, modestly larger hitbox and quiet arrival notification; gameplay unchanged.
+- Astral puzzles highlight legal connections and required stars. Confirmed, saved rewards play a short completion effect; reduced motion uses a static display.
+- Online service client and versioned read-only API/Docker scaffold added. Disabled by default; no accounts, cloud saves, telemetry, deployment, or VPS changes.
+
+Implemented storage/prestige decisions (8 October 2026):
+- Freestanding cabinet scene artwork replaces the flat grid; Workshop grid retained.
+- Lax ordinary storage: 5M Mana, 1M Shards, 100k Essence, 10k Elixirs; +50% of base per Reawakening; six purchased doubling levels.
+- Stardust storage follows current goal with three upgrades to 8×; banked Stardust determines Reawakening rewards.
+- Storage upgrades reset per run. Full production pauses without ingredient waste; paid payouts require room.
+- Moon Seal production stays linear through 250, then tapers gently with a distant 1,001× ceiling. Owned Seals remain intact.
+- Version 11 preserves surplus resources and adds a dismissible storage explanation.
+
+Stardust deposit refinement (8 October 2026): Reawakening now accepts manual Deposit to goal / Deposit all transfers. Deposits free storage, have no gameplay cap, cannot be withdrawn, and reset per run. Purchases do not reduce deposited progress. Version 12 preserves existing stock and starts deposit credit at zero.
+
+Balance/readability implementation: storage 250k/100k/15k/500; ten ordinary expansions; spark 2/s; first five Wells +50%. Concise/Classic presentation, categorized settings, optional full lesson explanations, resizable Tome footer, per-sanctuary scenery (save v13), visitor notice and optional chime. Manual Stardust deposits remain unlimited. Live Tk verification remains dependent on installing the missing Tcl/Tk 9 script libraries.
